@@ -33,15 +33,17 @@ def read_data(seed: int, train_size: int, test_size: int) -> Tuple[List[str], Li
 
     # TODO: Get training and testing datasets from `train` and `validation` splits
     # Step 1: shuffle with seed
+    seeded_dataset = dataset.shuffle(seed) #dataset.train_test_split(test_size=test_size, train_size=train_size, shuffle=True, seed=seed)
     # Step 2: select first train/test size data
-    train_data = ...
-    test_data = ...
+    train_data = seeded_dataset["train"][0:train_size]
+    test_data = seeded_dataset["validation"][0:test_size]
 
     # TODO: Extract sentences and labels
-    train_sentences = ...
-    train_labels = ...
-    test_sentences = ...
-    test_labels = ...
+    print(test_data)
+    train_sentences = train_data["sentence"]
+    train_labels = train_data["label"]
+    test_sentences = test_data["sentence"]
+    test_labels = test_data["label"]
 
     return train_sentences, train_labels, test_sentences, test_labels
 
@@ -149,7 +151,7 @@ def get_label_probs(
 
     # TODO: Initial probabilities from model responses
     for i, response in enumerate(tqdm(responses, desc="Get initial prob")):
-
+        print(response)
         top_logprobs = ...  # Hint: Check the structure of the response
         label_probs = ...
 
@@ -188,7 +190,8 @@ def get_label_probs(
     for idx, (i, j) in enumerate(all_missing_positions):
         response = additional_responses[idx]
         # TODO: Get the probability from the response
-        prob = ...
+        print(response)
+        prob = response
         all_label_probs[i][j] = prob
 
     return all_label_probs  # this is not normalized
@@ -219,7 +222,7 @@ def calibrate(
     num_labels = len(label_dict)
 
     # TODO: Create a prompt with content-free input
-    prompt = ...
+    prompt = create_prompt(q_prefix, a_prefix, few_shot_sentences, few_shot_labels, content_free_input)
     p_y = [0] * num_labels
 
     for i, answer in label_dict.items():
@@ -231,10 +234,11 @@ def calibrate(
         response = get_responses(prompts=[prompt+key], echo=True)[0]
 
         # TODO: Get the probability from the response
-        p_y[i] = ...
+        print(response)
+        p_y[i] = response
 
     # TODO: Normalize the probabilities
-    p_y = ...
+    p_y = [raw_prob/sum(p_y) for raw_prob in p_y]
 
     return p_y
 
