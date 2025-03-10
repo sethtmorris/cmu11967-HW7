@@ -152,8 +152,8 @@ def get_label_probs(
     # TODO: Initial probabilities from model responses
     for i, response in enumerate(tqdm(responses, desc="Get initial prob")):
         print(response)
-        top_logprobs = ...  # Hint: Check the structure of the response
-        label_probs = ...
+        top_logprobs = response.choices[0]["logprobs"]["top_logprobs"]  # Hint: Check the structure of the response
+        label_probs = response.choices[0]["label"]
 
         for j, label in label_dict.items():
             # add space to match the format
@@ -162,10 +162,10 @@ def get_label_probs(
 
             # Hint: If the label is in the top logprobs, use the probability
             if label in top_logprobs:
-                label_probs[j] += ...
+                label_probs[j] += label_probs
             else:
                 # add to missing positions
-                ...
+                all_missing_positions.append((i, j))
 
         all_label_probs.append(label_probs)
     all_label_probs = np.array(all_label_probs)
@@ -175,7 +175,7 @@ def get_label_probs(
 
     for i, j in all_missing_positions:
         # Hint: Based on the index, use create_prompt to create a new prompt for the missing position
-        prompt = ...
+        prompt = create_prompt(q_prefix, a_prefix, few_shot_sentences[i], few_shot_labels[j], test_sentences)
 
         # add space to match the format
         # Hint: It's important to understand why we append the label to the input prompt
@@ -191,7 +191,7 @@ def get_label_probs(
         response = additional_responses[idx]
         # TODO: Get the probability from the response
         print(response)
-        prob = response
+        prob = response["choices"][0]["probs"]["top_probs"][0]
         all_label_probs[i][j] = prob
 
     return all_label_probs  # this is not normalized
@@ -238,7 +238,11 @@ def calibrate(
         p_y[i] = response
 
     # TODO: Normalize the probabilities
-    p_y = [raw_prob/sum(p_y) for raw_prob in p_y]
+    sum_probs = 0
+    for p in p_y:
+        sum_probs += p.token_logprobs
+
+    p_y = [p.token_logprobs/sum_probs for p in p_y]
 
     return p_y
 
@@ -262,16 +266,16 @@ def eval_accuracy(all_label_probs: np.ndarray, test_labels: List[int], p_cf: Opt
 
     # TODO: Initialize W and b
     if p_cf is None:
-        W = ...
-        b = ...
+        W = np.identity(num_labels)
+        b = np.zeros(num_labels)
     else:
-        W = ...
-        b = ...
+        W = np.linalg.inv(np.diag(p_cf[0]))
+        b = np.zeros(num_labels)
 
     # TODO: Calculate the accuracy
     corrects = []
     for prob, label in zip(all_label_probs, test_labels):
-        ...
+        corrects.append(prob[label])
 
     accuracy = np.mean(corrects)
     
