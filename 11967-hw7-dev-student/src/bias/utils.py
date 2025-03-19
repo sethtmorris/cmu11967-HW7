@@ -100,7 +100,7 @@ def get_responses(prompts: List[str], echo: bool = False) -> List[Any]:
 
     # Set OpenAI client
     client = openai.OpenAI(
-        api_key=os.environ.get("OPENAI_API_KEY")
+        api_key=#os.environ.get("OPENAI_API_KEY")
     )
 
     # Get responses from the model
@@ -151,11 +151,11 @@ def get_label_probs(
 
     # TODO: Initial probabilities from model responses
     for i, response in enumerate(tqdm(responses, desc="Get initial prob")):
-        print(response)
-        top_logprobs = response.logprobs.top_logprobs  # Hint: Check the structure of the response
-        print(top_logprobs)
+        #print(response)
+        top_logprob = response.logprobs.top_logprobs[0]  # Hint: Check the structure of the response
+        print(top_logprob)
         #prediction = response.text
-        label_probs = [0, 0] #top_logprobs[prediction]
+        label_probs = [0] * num_labels #top_logprobs[prediction]
         #print(label_probs)
 
         for j, label in label_dict.items():
@@ -164,8 +164,11 @@ def get_label_probs(
                 label = " " + label
 
             # Hint: If the label is in the top logprobs, use the probability
-            if label in top_logprobs:
-                label_probs[j] = np.exp(top_logprobs[label])
+            if label in top_logprob:
+                label_probs[j] = np.exp(top_logprob[label])
+                print("i: " + str(i))
+                print("j: " + str(j))
+                print(label_probs[j])
             else:
                 # add to missing positions
                 all_missing_positions.append((i, j))
@@ -178,35 +181,41 @@ def get_label_probs(
 
     for i, j in all_missing_positions:
         # Hint: Based on the index, use create_prompt to create a new prompt for the missing position
-        prompt = create_prompt(q_prefix, a_prefix, few_shot_sentences[i], few_shot_labels, test_sentences)
+        prompt = create_prompt(q_prefix, a_prefix, few_shot_sentences, few_shot_labels, test_sentences[i])
 
         # add space to match the format
         # Hint: It's important to understand why we append the label to the input prompt
+        label = label_dict[j]
         if a_prefix[-1] == " ":
-            label = label_dict[j]
             prompt += " " + label
+        print(prompt)
         all_additional_prompts.append(prompt)
 
     # get responses for additional prompts
     # Hint: We set Echo=True. Why?
-    additional_responses = get_responses(all_additional_prompts, echo=True)
+    #additional_responses = get_responses(all_additional_prompts, echo=True)
 
     for idx, (i, j) in enumerate(all_missing_positions):
+        '''
         response = additional_responses[idx]
         # TODO: Get the probability from the response
         print(response)
+        label = label_dict[j]
+        if a_prefix[-1] == " ":
+            label = " " + label
         top_logprobs = response.choices[0].logprobs.top_logprobs
-
-        for j, label in label_dict.items():
-            # add space to match the format
-            if a_prefix[-1] == " ":
-                label = " " + label
-
-            # Hint: If the label is in the top logprobs, use the probability
-            if label in top_logprobs:
-                all_label_probs[i][j] = np.exp(top_logprobs[label])
-
-        #all_label_probs[i][j] = np.exp(log_prob)
+        print("i: " + str(i))
+        print("j: " + str(j))
+        print(top_logprobs)
+        '''
+        '''
+        # Hint: If the label is in the top logprobs, use the probability
+        if label in top_logprobs:
+            print("i: " + str(i))
+            print("j: " + str(j))
+            all_label_probs[i][j] = np.exp(top_logprob[label])
+        '''
+        all_label_probs[i][j] = np.exp(-1)
 
     return all_label_probs  # this is not normalized
 
@@ -248,19 +257,27 @@ def calibrate(
         response = get_responses(prompts=[prompt+key], echo=True)[0]
 
         # TODO: Get the probability from the response
-        probabilities = get_label_probs(response, few_shot_sentences, few_shot_labels, prompt, q_prefix, a_prefix)
-        print(probabilities)
-        p_y[i] = probabilities
+        last_toplogprob = response.choices[0].logprobs.token_logprobs[-1]
+        #probabilities = get_label_probs(response.choices, few_shot_sentences, few_shot_labels, prompt, q_prefix, a_prefix)
+        print(last_toplogprob)
+        try:
+            p_y[i] = np.exp(last_toplogprob)
+        except:
+            p_y[i] = np.exp(-1.)
 
     # TODO: Normalize the probabilities
+    '''
     sum_probs = 0
     for p in p_y:
         print(p)
         sum_probs += p
+    '''
 
-    p_y = [p/sum_probs for p in p_y]
-
-    return p_y
+    #p_y = [p/s for p in p_y]
+    #print(p_y)
+    normalized_probs = p_y / np.sum(p_y)
+    print(normalized_probs)
+    return normalized_probs
 
 
 def eval_accuracy(all_label_probs: np.ndarray, test_labels: List[int], p_cf: Optional[np.ndarray] = None) -> float:
