@@ -100,7 +100,7 @@ def get_responses(prompts: List[str], echo: bool = False) -> List[Any]:
 
     # Set OpenAI client
     client = openai.OpenAI(
-        api_key=#os.environ.get("OPENAI_API_KEY")
+        api_key = os.environ.get("OPENAI_API_KEY")
     )
 
     # Get responses from the model
@@ -116,7 +116,7 @@ def get_responses(prompts: List[str], echo: bool = False) -> List[Any]:
             logprobs=1,  # return log prob of top-1 token
             echo=echo  # whether to also return the input
         )
-        responses.append(response)
+        responses.append(response.choices[0])
 
     return responses
 
@@ -257,7 +257,7 @@ def calibrate(
         response = get_responses(prompts=[prompt+key], echo=True)[0]
 
         # TODO: Get the probability from the response
-        last_toplogprob = response.choices[0].logprobs.token_logprobs[-1]
+        last_toplogprob = response.logprobs.token_logprobs[-1]
         #probabilities = get_label_probs(response.choices, few_shot_sentences, few_shot_labels, prompt, q_prefix, a_prefix)
         print(last_toplogprob)
         try:
@@ -266,15 +266,8 @@ def calibrate(
             p_y[i] = np.exp(-1.)
 
     # TODO: Normalize the probabilities
-    '''
-    sum_probs = 0
-    for p in p_y:
-        print(p)
-        sum_probs += p
-    '''
-
-    #p_y = [p/s for p in p_y]
     #print(p_y)
+    p_y = np.array(p_y)
     normalized_probs = p_y / np.sum(p_y)
     print(normalized_probs)
     return normalized_probs
